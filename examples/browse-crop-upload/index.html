@@ -1,0 +1,133 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A complete example of Cropper.">
+  <meta name="keywords" content="HTML, CSS, JS, JavaScript, jQuery, PHP, image cropping, web development">
+  <meta name="author" content="Fengyuan Chen">
+  <title>Browse, Crop then Upload - Cropper</title>
+  <link rel="stylesheet" href="css/bootstrap.min.css">
+  <link rel="stylesheet" href="../../dist/cropper.min.css">
+</head>
+<body>
+  <form id="frmUp" action="up.php" method="post" enctype="multipart/form-data">
+  <div class="container">
+    <div class="row">
+      <div class="col-xs-12">
+        <div class="page-header">
+          <h2>Example: Crop file before upload</h2>
+        </div>
+      </div>
+    </div>
+    <div class="row bcu-wrap">
+      <div class="col-xs-4">
+        <img src="" class="bcu-preview" alt="Image Preview">
+      </div>
+      <div class="col-xs-4">
+        <input type="file" name="source_img" class="bcu-input" accept="image/*">
+        <br>
+        <canvas class="bcu-canvas" width="200" height="200"></canvas>
+        <hr>
+        <input type="submit" value=" Upload ">
+
+        <hr>
+        <div class="progress progress-striped active">
+          <div class="progress-bar" style="width: 0%"></div>
+        </div>
+      </div>
+      <div class="col-xs-4">
+        <div id="bcuMessage" class="well"></div>
+        <img src="" id="bcuResult" alt="Image result">
+      </div>
+    </div>
+  </div>
+  </form>
+
+  <script src="js/jquery.min.js"></script>
+  <script src="js/bootstrap.min.js"></script>
+  <script src="js/jquery.form.min.js"></script>
+  <script src="../../dist/cropper.min.js"></script>
+  <script>
+  function bcuPreview(input) {
+
+    if (input.files && input.files[0]) {
+      var reader = new FileReader();
+      var preview_el = $(input).closest('.bcu-wrap').find('.bcu-preview').first();
+
+      reader.onload = (function (preview_el) {
+        return function (e) {
+          preview_el.attr('src', e.target.result).show();
+        };
+      })(preview_el);
+
+      reader.readAsDataURL(input.files[0]);
+    }
+  }
+
+  var data_blob  = null;
+  var field_name = '';
+
+  $(function() {
+    $(".bcu-preview").hide();
+    $(".bcu-input").change(function() {
+      var file = this.files && this.files[0];
+      field_name = $(this).attr("name");
+
+      if (file && file.type.match(/image.*/)) {
+        var reader     = new FileReader();
+        var preview_el = $(this).closest('.bcu-wrap').find('.bcu-preview').first();
+        var canvas     = $(this).closest('.bcu-wrap').find('.bcu-canvas').first().get(0);
+        var context    = canvas.getContext('2d');
+
+        reader.onload = (function (preview_el) {
+          return function (e) {
+            var img_el = preview_el.get(0);
+            preview_el.attr('src', e.target.result).show();
+            preview_el.cropper({
+                aspectRatio: 1,
+                done: function(data) {
+                    context.drawImage(img_el, data.x1, data.y1, data.width, data.height, 0, 0, 200, 200);
+                    var blob_bin = atob(canvas.toDataURL().split(',')[1]);
+                    var array = [];
+                    for(var i = 0; i < blob_bin.length; i++) {
+                        array.push(blob_bin.charCodeAt(i));
+                    }
+                    data_blob = new Blob([new Uint8Array(array)], {type: 'image/png'});
+                }
+            });
+          };
+        })(preview_el, canvas, context, data_blob, field_name);
+
+        reader.readAsDataURL(file);
+      }
+    });
+
+    $("#frmUp").ajaxForm({
+        beforeSend: function(xhr, o) {
+          var formdata = new FormData();
+          formdata.append(field_name, data_blob, 'file.png');
+          o.data = formdata;
+          $(".progress-bar").css('width', '0%');
+        },
+        uploadProgress: function(event, position, total, percentComplete) {
+            $(".progress-bar").css('width', percentComplete+'%');
+        },
+        success: function() {
+            $(".progress-bar").css('width', '100%');
+        },
+      complete: function(xhr) {
+        var resp = xhr.responseJSON;
+        if (resp.file) {
+          $("#bcuResult").attr("src", resp.file);
+        }
+        $("#bcuMessage").html(resp.message);
+        $(".progress-bar").css('width', '0%');
+      }
+    });
+
+  });
+  </script>
+</body>
+</html>
